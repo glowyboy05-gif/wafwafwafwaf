@@ -28,11 +28,8 @@ jobs:
     - name: 🔧 Install dependencies
       run: npm install
 
-    - name: 📱 Install Capacitor CLI globally
-      run: npm install -g @capacitor/cli
-
     - name: 📱 Initialize Capacitor
-      run: cap init "Q-Control" "com.qcontrol.mobile" --web-dir=out
+      run: npx cap init "Q-Control" "com.qcontrol.mobile" --web-dir=out
 
     - name: 🏗️ Build Next.js app
       env:
@@ -47,10 +44,10 @@ jobs:
         touch out/.nojekyll
 
     - name: 📱 Add Android platform
-      run: cap add android
+      run: npx cap add android
 
     - name: 🔄 Sync Capacitor
-      run: cap sync android
+      run: npx cap sync android
 
     - name: 🛠️ Build APK
       run: |
