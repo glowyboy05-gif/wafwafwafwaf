@@ -40,9 +40,6 @@ jobs:
         ls -la out/ || echo "out directory does not exist!"
         ls -la out/index.html || echo "index.html does not exist!"
 
-    - name: 📱 Add Android platform
-      run: npx cap add android
-
     - name: 🔄 Sync Capacitor
       run: npx cap sync android
 
