@@ -28,20 +28,14 @@ jobs:
     - name: 🔧 Install dependencies
       run: npm install
 
-    - name: 📱 Initialize Capacitor
-      run: npx cap init "Q-Control" "com.qcontrol.mobile" --web-dir=out
-
     - name: 🏗️ Build Next.js app
       env:
         NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
         NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
       run: npm run build
 
-    - name: 📤 Copy files to out directory
-      run: |
-        mkdir -p out
-        cp -r public/* out/ 2>/dev/null || true
-        touch out/.nojekyll
+    - name: 📱 Initialize Capacitor
+      run: npx cap init "Q-Control" "com.qcontrol.mobile" --web-dir=out
 
     - name: 📱 Add Android platform
       run: npx cap add android
