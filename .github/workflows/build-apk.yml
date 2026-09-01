@@ -40,9 +40,6 @@ jobs:
         ls -la out/ || echo "out directory does not exist!"
         ls -la out/index.html || echo "index.html does not exist!"
 
-    - name: 📱 Initialize Capacitor
-      run: npx cap init "Q-Control" "com.qcontrol.mobile" --web-dir=out
-
     - name: 📱 Add Android platform
       run: npx cap add android
 
