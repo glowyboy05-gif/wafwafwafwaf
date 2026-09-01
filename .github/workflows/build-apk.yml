@@ -34,6 +34,12 @@ jobs:
         NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
       run: npm run build
 
+    - name: 🔍 Verify out directory
+      run: |
+        echo "Checking out directory..."
+        ls -la out/ || echo "out directory does not exist!"
+        ls -la out/index.html || echo "index.html does not exist!"
+
     - name: 📱 Initialize Capacitor
       run: npx cap init "Q-Control" "com.qcontrol.mobile" --web-dir=out
 
