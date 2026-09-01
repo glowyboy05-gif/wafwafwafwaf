@@ -59,4 +59,4 @@ jobs:
         path: android/app/build/outputs/apk/debug/app-debug.apk
 
     - name: 🎉 Build Complete
-      run: echo "✅ APK built successfully! Download from Artifacts."
+      run: echo "✅ APK built successfully with Supabase credentials! Download from Artifacts."
