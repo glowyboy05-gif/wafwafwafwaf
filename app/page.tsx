@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import { useRouter } from "next/navigation"
 import { AlertTriangle, BarChart3, Check, ChevronRight, FileText, Globe2, History, LocateFixed, LockKeyhole, LogOut, Menu, Moon, ScanLine, ShieldCheck, UserRound, X } from "lucide-react"
 import { supabase } from "@/lib/supabase"
 
@@ -105,10 +106,22 @@ function Login({ onLogin }: { onLogin: (user: any) => void }) {
 }
 
 function Dashboard({ user, onLogout }: { user: any; onLogout: () => void }) {
+  const router = useRouter()
   const [menuOpen, setMenuOpen] = useState(false)
   const [activeTab, setActiveTab] = useState("Q-Control")
   const [night, setNight] = useState(false)
   const [message, setMessage] = useState("")
+  
+  // Apply dark mode to document
+  useEffect(() => {
+    if (night) {
+      document.documentElement.classList.add('dark')
+      document.body.classList.add('dark')
+    } else {
+      document.documentElement.classList.remove('dark')
+      document.body.classList.remove('dark')
+    }
+  }, [night])
   
   const notify = (text: string) => { 
     setMessage(text)
@@ -194,7 +207,7 @@ function Dashboard({ user, onLogout }: { user: any; onLogout: () => void }) {
   const nav = [
     { label: "Q-Control", icon: ShieldCheck, action: () => {} }, 
     { label: "Q-Patrol", icon: BarChart3, action: () => notify("Q-Patrol") }, 
-    { label: "Instructions", icon: FileText, action: () => { window.location.href = '/instructions' } }
+    { label: "Instructions", icon: FileText, action: () => router.push('/instructions') }
   ]
 
   const userName = user?.full_name || `${user?.first_name || ''} ${user?.last_name || ''}`.trim() || 'Agent'
@@ -237,7 +250,7 @@ function Dashboard({ user, onLogout }: { user: any; onLogout: () => void }) {
         <h1>Q-Control Mobile</h1>
         <p className="tagline">Stay Safe, Stay Connected</p>
         <div className="action-stack">
-          <button className="action-button scan" onClick={() => window.location.href = '/scan'}>
+          <button className="action-button scan" onClick={() => router.push('/scan')}>
             <ScanLine size={22} />
             <span>SCAN</span>
           </button>
@@ -290,7 +303,7 @@ function Dashboard({ user, onLogout }: { user: any; onLogout: () => void }) {
               </button>
             </div>
             <div className="drawer-items">
-              <button onClick={() => { setMenuOpen(false); window.location.href = '/rapport' }}>
+              <button onClick={() => { setMenuOpen(false); router.push('/rapport') }}>
                 <FileText />Rapport
               </button>
               <button onClick={() => notify("Historique ouvert")}>
