@@ -123,14 +123,45 @@ function Dashboard({ user, onLogout }: { user: any; onLogout: () => void }) {
     }
   }, [night])
   
+  // Request geolocation permission on mount
+  useEffect(() => {
+    if ('geolocation' in navigator) {
+      navigator.geolocation.getCurrentPosition(
+        () => console.log('✅ Geolocation permission granted'),
+        (error) => console.warn('⚠️ Geolocation permission:', error.message),
+        { enableHighAccuracy: false, timeout: 5000, maximumAge: Infinity }
+      )
+    }
+  }, [])
+  
   const notify = (text: string) => { 
     setMessage(text)
     window.setTimeout(() => setMessage(""), 2200) 
   }
 
+  const handleScan = async () => {
+    try {
+      // Request camera permission and open scanner
+      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } })
+      stream.getTracks().forEach(track => track.stop()) // Stop immediately, just checking permission
+      notify("Scanner ouvert - fonctionnalité à venir")
+      // TODO: Implement QR scanner here
+    } catch (error) {
+      console.error('Camera permission error:', error)
+      notify("Permission caméra refusée")
+    }
+  }
+
   const handleSOS = async () => {
     try {
       if ('geolocation' in navigator) {
+        // Request permission first
+        const permission = await navigator.permissions.query({ name: 'geolocation' })
+        if (permission.state === 'denied') {
+          notify("Permission géolocalisation refusée")
+          return
+        }
+        
         navigator.geolocation.getCurrentPosition(async (position) => {
           const sosData = {
             employee_id: user.id,
@@ -138,7 +169,7 @@ function Dashboard({ user, onLogout }: { user: any; onLogout: () => void }) {
             latitude: position.coords.latitude,
             longitude: position.coords.longitude,
             timestamp: new Date().toISOString(),
-            status: 'Active',  // ✅ SET STATUS AS ACTIVE!
+            status: 'Active',
             guard_name: user.full_name || `${user.first_name || ''} ${user.last_name || ''}`.trim() || 'Unknown Guard',
             guard_phone: user.phone_number || null,
           }
@@ -155,7 +186,11 @@ function Dashboard({ user, onLogout }: { user: any; onLogout: () => void }) {
           }
         }, (error) => {
           console.error('Geolocation error:', error)
-          notify("Erreur de géolocalisation")
+          notify("Erreur de géolocalisation - Activez la localisation")
+        }, {
+          enableHighAccuracy: true,
+          timeout: 10000,
+          maximumAge: 0
         })
       } else {
         notify("Géolocalisation non disponible")
@@ -169,6 +204,7 @@ function Dashboard({ user, onLogout }: { user: any; onLogout: () => void }) {
   const handleCheckpoint = async () => {
     try {
       if ('geolocation' in navigator) {
+        // Request permission first
         navigator.geolocation.getCurrentPosition(async (position) => {
           await supabase.from('employee_location_tracking').upsert({
             employee_id: user.id,
@@ -178,7 +214,14 @@ function Dashboard({ user, onLogout }: { user: any; onLogout: () => void }) {
             is_active: true,
             timestamp: new Date().toISOString(),
           }, { onConflict: 'employee_id' })
-          notify("Checkpoint enregistré")
+          notify("✅ Checkpoint enregistré")
+        }, (error) => {
+          console.error('Checkpoint geolocation error:', error)
+          notify("Erreur - Activez la localisation")
+        }, {
+          enableHighAccuracy: true,
+          timeout: 10000,
+          maximumAge: 0
         })
       } else {
         notify("Géolocalisation non disponible")
@@ -250,7 +293,7 @@ function Dashboard({ user, onLogout }: { user: any; onLogout: () => void }) {
         <h1>Q-Control Mobile</h1>
         <p className="tagline">Stay Safe, Stay Connected</p>
         <div className="action-stack">
-          <button className="action-button scan" onClick={() => router.push('/scan')}>
+          <button className="action-button scan" onClick={handleScan}>
             <ScanLine size={22} />
             <span>SCAN</span>
           </button>
