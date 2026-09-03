@@ -4,6 +4,8 @@ import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { AlertTriangle, BarChart3, Check, ChevronRight, FileText, Globe2, History, LocateFixed, LockKeyhole, LogOut, Menu, Moon, ScanLine, ShieldCheck, UserRound, X } from "lucide-react"
 import { supabase } from "@/lib/supabase"
+import { Geolocation } from '@capacitor/geolocation'
+import { App as CapacitorApp } from '@capacitor/app'
 
 const logoUrl = "https://hebbkx1anhila5yf.public.blob.vercel-storage.com/q-controle-logo-zE07zuJZaNApC9syFlYI4qGPNUgvW9.jpg"
 
@@ -111,6 +113,7 @@ function Dashboard({ user, onLogout }: { user: any; onLogout: () => void }) {
   const [activeTab, setActiveTab] = useState("Q-Control")
   const [night, setNight] = useState(false)
   const [message, setMessage] = useState("")
+  const [locationPermission, setLocationPermission] = useState<'granted' | 'denied' | 'prompt'>('prompt')
   
   // Apply dark mode to document
   useEffect(() => {
@@ -125,110 +128,114 @@ function Dashboard({ user, onLogout }: { user: any; onLogout: () => void }) {
   
   // Request geolocation permission on mount
   useEffect(() => {
-    if ('geolocation' in navigator) {
-      navigator.geolocation.getCurrentPosition(
-        () => console.log('✅ Geolocation permission granted'),
-        (error) => console.warn('⚠️ Geolocation permission:', error.message),
-        { enableHighAccuracy: false, timeout: 5000, maximumAge: Infinity }
-      )
-    }
+    requestLocationPermission()
   }, [])
+  
+  const requestLocationPermission = async () => {
+    try {
+      const permission = await Geolocation.checkPermissions()
+      console.log('📍 Location permission:', permission.location)
+      
+      if (permission.location === 'prompt' || permission.location === 'prompt-with-rationale') {
+        const request = await Geolocation.requestPermissions()
+        setLocationPermission(request.location === 'granted' ? 'granted' : 'denied')
+      } else {
+        setLocationPermission(permission.location === 'granted' ? 'granted' : 'denied')
+      }
+    } catch (error) {
+      console.error('Location permission error:', error)
+      setLocationPermission('denied')
+    }
+  }
   
   const notify = (text: string) => { 
     setMessage(text)
     window.setTimeout(() => setMessage(""), 2200) 
   }
 
-  const handleScan = async () => {
-    try {
-      // Request camera permission and open scanner
-      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } })
-      stream.getTracks().forEach(track => track.stop()) // Stop immediately, just checking permission
-      notify("Scanner ouvert - fonctionnalité à venir")
-      // TODO: Implement QR scanner here
-    } catch (error) {
-      console.error('Camera permission error:', error)
-      notify("Permission caméra refusée")
-    }
+  const handleScan = () => {
+    // Navigate to scan page
+    router.push('/scan')
   }
 
   const handleSOS = async () => {
     try {
-      if ('geolocation' in navigator) {
-        // Request permission first
-        const permission = await navigator.permissions.query({ name: 'geolocation' })
-        if (permission.state === 'denied') {
-          notify("Permission géolocalisation refusée")
-          return
-        }
-        
-        navigator.geolocation.getCurrentPosition(async (position) => {
-          const sosData = {
-            employee_id: user.id,
-            account_id: user.account_id || null,
-            latitude: position.coords.latitude,
-            longitude: position.coords.longitude,
-            timestamp: new Date().toISOString(),
-            status: 'Active',
-            guard_name: user.full_name || `${user.first_name || ''} ${user.last_name || ''}`.trim() || 'Unknown Guard',
-            guard_phone: user.phone_number || null,
-          }
-          
-          console.log('🚨 Sending SOS:', sosData)
-          
-          const { error: sosError } = await supabase.from('sos_alerts').insert(sosData)
-          
-          if (sosError) {
-            console.error('SOS insert error:', sosError)
-            notify("Erreur SOS")
-          } else {
-            notify("🚨 Alerte SOS envoyée!")
-          }
-        }, (error) => {
-          console.error('Geolocation error:', error)
-          notify("Erreur de géolocalisation - Activez la localisation")
-        }, {
-          enableHighAccuracy: true,
-          timeout: 10000,
-          maximumAge: 0
-        })
-      } else {
-        notify("Géolocalisation non disponible")
+      // Check permission first
+      const permission = await Geolocation.checkPermissions()
+      if (permission.location === 'denied') {
+        notify("Permission géolocalisation refusée")
+        return
       }
-    } catch (error) {
+
+      // Get current position using Capacitor
+      const position = await Geolocation.getCurrentPosition({
+        enableHighAccuracy: true,
+        timeout: 10000
+      })
+      
+      const sosData = {
+        employee_id: user.id,
+        account_id: user.account_id || null,
+        latitude: position.coords.latitude,
+        longitude: position.coords.longitude,
+        timestamp: new Date().toISOString(),
+        status: 'Active',
+        guard_name: user.full_name || `${user.first_name || ''} ${user.last_name || ''}`.trim() || 'Unknown Guard',
+        guard_phone: user.phone_number || null,
+      }
+      
+      console.log('🚨 Sending SOS:', sosData)
+      
+      const { error: sosError } = await supabase.from('sos_alerts').insert(sosData)
+      
+      if (sosError) {
+        console.error('SOS insert error:', sosError)
+        notify("Erreur SOS")
+      } else {
+        notify("🚨 Alerte SOS envoyée!")
+      }
+    } catch (error: any) {
       console.error('SOS error:', error)
-      notify("Erreur SOS")
+      if (error.message?.includes('location')) {
+        notify("Erreur de géolocalisation - Vérifiez les permissions")
+      } else {
+        notify("Erreur SOS")
+      }
     }
   }
 
   const handleCheckpoint = async () => {
     try {
-      if ('geolocation' in navigator) {
-        // Request permission first
-        navigator.geolocation.getCurrentPosition(async (position) => {
-          await supabase.from('employee_location_tracking').upsert({
-            employee_id: user.id,
-            account_id: user.account_id,
-            latitude: position.coords.latitude,
-            longitude: position.coords.longitude,
-            is_active: true,
-            timestamp: new Date().toISOString(),
-          }, { onConflict: 'employee_id' })
-          notify("✅ Checkpoint enregistré")
-        }, (error) => {
-          console.error('Checkpoint geolocation error:', error)
-          notify("Erreur - Activez la localisation")
-        }, {
-          enableHighAccuracy: true,
-          timeout: 10000,
-          maximumAge: 0
-        })
-      } else {
-        notify("Géolocalisation non disponible")
+      // Check permission first
+      const permission = await Geolocation.checkPermissions()
+      if (permission.location === 'denied') {
+        notify("Permission géolocalisation refusée")
+        return
       }
-    } catch (error) {
+
+      // Get current position using Capacitor
+      const position = await Geolocation.getCurrentPosition({
+        enableHighAccuracy: true,
+        timeout: 10000
+      })
+      
+      await supabase.from('employee_location_tracking').upsert({
+        employee_id: user.id,
+        account_id: user.account_id,
+        latitude: position.coords.latitude,
+        longitude: position.coords.longitude,
+        is_active: true,
+        timestamp: new Date().toISOString(),
+      }, { onConflict: 'employee_id' })
+      
+      notify("✅ Checkpoint enregistré")
+    } catch (error: any) {
       console.error('Checkpoint error:', error)
-      notify("Erreur checkpoint")
+      if (error.message?.includes('location')) {
+        notify("Erreur - Vérifiez les permissions de localisation")
+      } else {
+        notify("Erreur checkpoint")
+      }
     }
   }
 
@@ -248,9 +255,9 @@ function Dashboard({ user, onLogout }: { user: any; onLogout: () => void }) {
   }
 
   const nav = [
-    { label: "Q-Control", icon: ShieldCheck, action: () => {} }, 
-    { label: "Q-Patrol", icon: BarChart3, action: () => notify("Q-Patrol") }, 
-    { label: "Instructions", icon: FileText, action: () => router.push('/instructions') }
+    { label: "Q-Control", icon: ShieldCheck, action: () => setActiveTab("Q-Control") }, 
+    { label: "Q-Patrol", icon: BarChart3, action: () => { setActiveTab("Q-Patrol"); notify("Q-Patrol") } }, 
+    { label: "Instructions", icon: FileText, action: () => { setActiveTab("Instructions"); router.push('/instructions') } }
   ]
 
   const userName = user?.full_name || `${user?.first_name || ''} ${user?.last_name || ''}`.trim() || 'Agent'
@@ -308,10 +315,7 @@ function Dashboard({ user, onLogout }: { user: any; onLogout: () => void }) {
           <button 
             key={label} 
             className={activeTab === label ? "active" : ""} 
-            onClick={() => { 
-              setActiveTab(label)
-              action()
-            }}
+            onClick={() => action()}
           >
             <Icon size={19} />
             <span>{label}</span>

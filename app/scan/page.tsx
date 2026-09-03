@@ -1,30 +1,96 @@
 "use client"
 
-import { useState, useEffect } from "react"
-import { ArrowLeft, Camera, Check } from "lucide-react"
+import { useState, useEffect, useRef } from "react"
+import { ArrowLeft, Camera, Check, X } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { supabase } from "@/lib/supabase"
+import { Html5Qrcode } from "html5-qrcode"
 
 export default function ScanPage() {
   const router = useRouter()
   const [scanning, setScanning] = useState(false)
   const [result, setResult] = useState<string | null>(null)
   const [message, setMessage] = useState("")
+  const [cameraPermission, setCameraPermission] = useState<'granted' | 'denied' | 'prompt'>('prompt')
+  const html5QrCodeRef = useRef<Html5Qrcode | null>(null)
+  const scannerRef = useRef<HTMLDivElement>(null)
 
-  const handleScan = async () => {
-    // Simulated scan - in production, use a QR scanner library
-    setScanning(true)
+  useEffect(() => {
+    // Check camera permission on mount
+    checkCameraPermission()
     
+    return () => {
+      // Cleanup scanner on unmount
+      if (html5QrCodeRef.current?.isScanning) {
+        html5QrCodeRef.current.stop()
+      }
+    }
+  }, [])
+
+  const checkCameraPermission = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ video: true })
+      stream.getTracks().forEach(track => track.stop())
+      setCameraPermission('granted')
+    } catch (error) {
+      console.error('Camera permission check:', error)
+      setCameraPermission('denied')
+    }
+  }
+
+  const startScanner = async () => {
+    try {
+      setScanning(true)
+      setResult(null)
+      setMessage("")
+
+      // Request camera permission
+      await checkCameraPermission()
+      
+      if (!html5QrCodeRef.current) {
+        html5QrCodeRef.current = new Html5Qrcode("qr-reader")
+      }
+
+      await html5QrCodeRef.current.start(
+        { facingMode: "environment" },
+        {
+          fps: 10,
+          qrbox: { width: 250, height: 250 }
+        },
+        async (decodedText) => {
+          // QR code detected
+          await handleScanResult(decodedText)
+          await stopScanner()
+        },
+        (errorMessage) => {
+          // Scanning in progress, errors are normal
+        }
+      )
+    } catch (error) {
+      console.error('Scanner start error:', error)
+      setMessage("Erreur: Impossible d'accéder à la caméra")
+      setScanning(false)
+      setCameraPermission('denied')
+    }
+  }
+
+  const stopScanner = async () => {
+    try {
+      if (html5QrCodeRef.current?.isScanning) {
+        await html5QrCodeRef.current.stop()
+      }
+      setScanning(false)
+    } catch (error) {
+      console.error('Scanner stop error:', error)
+      setScanning(false)
+    }
+  }
+
+  const handleScanResult = async (scannedData: string) => {
     try {
       const user = JSON.parse(localStorage.getItem('q_control_user') || '{}')
       
-      // Simulated QR code scan result (replace with actual scanner)
-      const scannedData = prompt("Enter QR code or Patrol Point ID:")
-      
-      if (!scannedData) {
-        setScanning(false)
-        return
-      }
+      console.log('Scanned QR code:', scannedData)
 
       // Try to match patrol point
       const { data: patrolPoint, error: patrolError } = await supabase
@@ -44,7 +110,7 @@ export default function ScanPage() {
         })
 
         setResult(`✓ Patrol Point: ${patrolPoint.point_name}`)
-        setMessage("Patrol scan recorded!")
+        setMessage("Scan de patrouille enregistré!")
       } else {
         // Try to match employee/visitor/vehicle
         const { data: entity } = await supabase
@@ -55,17 +121,15 @@ export default function ScanPage() {
 
         if (entity) {
           setResult(`✓ Employee: ${entity.full_name}`)
-          setMessage("Employee scanned!")
+          setMessage("Employé scanné!")
         } else {
-          setResult(`❌ Unknown QR code`)
-          setMessage("Not found in system")
+          setResult(`QR Code: ${scannedData}`)
+          setMessage("Code scanné avec succès")
         }
       }
     } catch (error) {
-      console.error('Scan error:', error)
-      setMessage("Scan failed")
-    } finally {
-      setScanning(false)
+      console.error('Scan processing error:', error)
+      setMessage("Erreur lors du traitement du scan")
     }
   }
 
@@ -96,26 +160,77 @@ export default function ScanPage() {
         textAlign: 'center',
         boxShadow: '0 4px 6px rgba(0,0,0,0.1)'
       }}>
-        <Camera size={80} style={{ margin: '0 auto 20px', color: '#007bff' }} />
-        
-        <button
-          onClick={handleScan}
-          disabled={scanning}
-          style={{
-            width: '100%',
+        {cameraPermission === 'denied' && (
+          <div style={{
             padding: '16px',
-            backgroundColor: scanning ? '#6c757d' : '#007bff',
-            color: 'white',
-            border: 'none',
-            borderRadius: '12px',
-            fontSize: '18px',
-            fontWeight: 'bold',
-            cursor: scanning ? 'not-allowed' : 'pointer',
+            borderRadius: '8px',
+            backgroundColor: '#fff3cd',
+            color: '#856404',
             marginBottom: '20px'
-          }}
-        >
-          {scanning ? '⏳ Scanning...' : '📷 Start Scan'}
-        </button>
+          }}>
+            ⚠️ Permission caméra refusée. Veuillez activer la caméra dans les paramètres.
+          </div>
+        )}
+
+        {!scanning && (
+          <>
+            <Camera size={80} style={{ margin: '0 auto 20px', color: '#007bff' }} />
+            
+            <button
+              onClick={startScanner}
+              style={{
+                width: '100%',
+                padding: '16px',
+                backgroundColor: '#007bff',
+                color: 'white',
+                border: 'none',
+                borderRadius: '12px',
+                fontSize: '18px',
+                fontWeight: 'bold',
+                cursor: 'pointer',
+                marginBottom: '20px'
+              }}
+            >
+              📷 Démarrer le Scan
+            </button>
+          </>
+        )}
+
+        {scanning && (
+          <>
+            <div 
+              id="qr-reader" 
+              ref={scannerRef}
+              style={{ 
+                width: '100%', 
+                marginBottom: '20px',
+                borderRadius: '12px',
+                overflow: 'hidden'
+              }}
+            />
+            
+            <button
+              onClick={stopScanner}
+              style={{
+                width: '100%',
+                padding: '16px',
+                backgroundColor: '#dc3545',
+                color: 'white',
+                border: 'none',
+                borderRadius: '12px',
+                fontSize: '18px',
+                fontWeight: 'bold',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '8px'
+              }}
+            >
+              <X size={20} /> Arrêter le Scan
+            </button>
+          </>
+        )}
 
         {result && (
           <div style={{
@@ -123,7 +238,7 @@ export default function ScanPage() {
             borderRadius: '8px',
             backgroundColor: result.includes('✓') ? '#d4edda' : '#f8d7da',
             color: result.includes('✓') ? '#155724' : '#721c24',
-            marginBottom: '12px'
+            marginTop: '20px'
           }}>
             {result}
           </div>

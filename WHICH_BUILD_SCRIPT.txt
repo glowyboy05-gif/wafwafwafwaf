@@ -1,0 +1,85 @@
+╔═══════════════════════════════════════════════════════════════╗
+║                                                               ║
+║            WHICH BUILD SCRIPT SHOULD YOU USE?                 ║
+║                                                               ║
+╚═══════════════════════════════════════════════════════════════╝
+
+
+🎯 TWO BUILD SCRIPTS AVAILABLE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+
+📜 Option 1: build-apk.bat (Recommended for Beginners)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+✅ Shows detailed progress
+✅ Waits for you to read messages
+✅ Better error messages
+✅ Helpful instructions on failure
+
+Use this if:
+  • This is your first time building
+  • You want to see what's happening
+  • You want to read error messages before window closes
+
+
+⚡ Option 2: build-apk-simple.bat (For Experienced Users)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+✅ Runs straight through
+✅ No pauses or waits
+✅ Faster to complete
+✅ Shows errors then exits
+
+Use this if:
+  • You've built before
+  • You don't want to press keys
+  • You want it to run and finish automatically
+  • You're comfortable reading terminal output
+
+
+🔧 Option 3: Manual Commands
+━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+If you prefer full control:
+
+npm run build
+npx cap sync android
+cd android
+.\gradlew.bat assembleDebug
+
+
+💡 RECOMMENDATION
+━━━━━━━━━━━━━━━━
+
+First time building?
+  👉 Use: build-apk.bat
+
+Building again and it worked before?
+  👉 Use: build-apk-simple.bat
+
+Want to see all steps?
+  👉 Use: build-apk.bat
+
+Just want it done fast?
+  👉 Use: build-apk-simple.bat
+
+
+🆘 IF BUILD CRASHES OR CLOSES IMMEDIATELY
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+1. Use build-apk.bat (not the simple version)
+2. It will wait at errors so you can read them
+3. Note the error message
+4. Check INSTALL_JAVA.md if Java-related
+5. Check error message for other issues
+
+
+📍 WHERE IS MY APK?
+━━━━━━━━━━━━━━━━━━
+
+After successful build:
+android\app\build\outputs\apk\debug\app-debug.apk
+
+
+═══════════════════════════════════════════════════════════════
