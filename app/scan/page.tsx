@@ -10,6 +10,7 @@ export default function ScanPage() {
   const [showModal, setShowModal] = useState(false)
   const [scannedData, setScannedData] = useState<any>(null)
   const [result, setResult] = useState<any>(null)
+  const [isScanning, setIsScanning] = useState(false)
 
   useEffect(() => {
     startScanning()
@@ -21,6 +22,14 @@ export default function ScanPage() {
 
   const startScanning = async () => {
     try {
+      // Check if supported
+      const { supported } = await BarcodeScanner.isSupported()
+      if (!supported) {
+        alert('Barcode scanning not supported')
+        router.push('/')
+        return
+      }
+
       // Request permissions
       const { camera } = await BarcodeScanner.requestPermissions()
       
@@ -30,21 +39,27 @@ export default function ScanPage() {
         return
       }
 
+      // Hide the webpage to show camera
+      document.body.style.background = 'transparent'
+      const app = document.querySelector('#__next') as HTMLElement
+      if (app) {
+        app.style.display = 'none'
+      }
+
+      setIsScanning(true)
+
       // Add listener for barcode detection
       await BarcodeScanner.addListener('barcodeScanned', async (result) => {
         console.log('Barcode scanned:', result.barcode)
         await handleScanResult(result.barcode.displayValue)
       })
 
-      // Make background of WebView transparent
-      document.querySelector('body')?.classList.add('barcode-scanner-active')
-
       // Start the barcode scanner
       await BarcodeScanner.startScan()
       
     } catch (error) {
       console.error('Scanner error:', error)
-      alert('Error starting scanner')
+      alert('Error: ' + error)
       router.push('/')
     }
   }
@@ -53,7 +68,15 @@ export default function ScanPage() {
     try {
       await BarcodeScanner.stopScan()
       await BarcodeScanner.removeAllListeners()
-      document.querySelector('body')?.classList.remove('barcode-scanner-active')
+      
+      // Show the webpage again
+      const app = document.querySelector('#__next') as HTMLElement
+      if (app) {
+        app.style.display = 'block'
+      }
+      document.body.style.background = ''
+      
+      setIsScanning(false)
     } catch (error) {
       console.error('Stop scanning error:', error)
     }
@@ -171,8 +194,42 @@ export default function ScanPage() {
     }
   }
 
+  const handleClose = async () => {
+    await stopScanning()
+    router.push('/')
+  }
+
   return (
     <>
+      {/* Close button - visible over camera */}
+      {isScanning && (
+        <div style={{
+          position: 'fixed',
+          top: '20px',
+          left: '20px',
+          zIndex: 999999
+        }}>
+          <button
+            onClick={handleClose}
+            style={{
+              backgroundColor: 'rgba(0,0,0,0.7)',
+              color: 'white',
+              border: 'none',
+              borderRadius: '50%',
+              width: '50px',
+              height: '50px',
+              fontSize: '24px',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center'
+            }}
+          >
+            ×
+          </button>
+        </div>
+      )}
+
       {/* Result Message */}
       {result && (
         <div style={{
@@ -186,7 +243,7 @@ export default function ScanPage() {
           color: 'white',
           fontSize: '18px',
           fontWeight: 'bold',
-          zIndex: 99999,
+          zIndex: 999999,
           textAlign: 'center'
         }}>
           {result.message}
@@ -204,7 +261,7 @@ export default function ScanPage() {
               right: 0,
               bottom: 0,
               backgroundColor: 'rgba(0,0,0,0.8)',
-              zIndex: 99998
+              zIndex: 999998
             }}
             onClick={() => setShowModal(false)}
           />
@@ -218,7 +275,7 @@ export default function ScanPage() {
             padding: '30px',
             maxWidth: '400px',
             width: '90%',
-            zIndex: 99999,
+            zIndex: 999999,
             boxShadow: '0 10px 40px rgba(0,0,0,0.3)'
           }}>
             <button
