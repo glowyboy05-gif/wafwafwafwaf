@@ -2,23 +2,93 @@
 
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
-import { AlertTriangle, BarChart3, Check, ChevronRight, FileText, Globe2, History, LocateFixed, LockKeyhole, LogOut, Menu, Moon, ScanLine, ShieldCheck, UserRound, X } from "lucide-react"
+import { AlertTriangle, BarChart3, Check, ChevronRight, FileText, Globe2, LocateFixed, LockKeyhole, LogOut, Menu, Moon, ScanLine, ShieldCheck, UserRound, X } from "lucide-react"
 import { supabase } from "@/lib/supabase"
 import { Geolocation } from '@capacitor/geolocation'
 import { App as CapacitorApp } from '@capacitor/app'
 
 const logoUrl = "https://hebbkx1anhila5yf.public.blob.vercel-storage.com/q-controle-logo-zE07zuJZaNApC9syFlYI4qGPNUgvW9.jpg"
 
+// Translations
+const translations = {
+  fr: {
+    welcome: "Bienvenue sur Q-Control",
+    subtitle: "Connectez-vous à votre espace de contrôle mobile.",
+    identifier: "Identifiant",
+    pin: "Code PIN",
+    login: "Se connecter",
+    securityAgent: "Agent de sécurité",
+    sos: "SOS",
+    scan: "SCAN",
+    checkpoint: "CHECKPOINT",
+    qControl: "Q-Control",
+    qPatrol: "Q-Patrol",
+    instructions: "Instructions",
+    report: "Rapport",
+    nightMode: "Mode Nuit",
+    language: "Langue",
+    logout: "Déconnexion",
+    sosConfirm: "Êtes-vous sûr de vouloir envoyer une alerte SOS ?",
+    cancel: "Annuler",
+    confirm: "Confirmer",
+    sosSent: "🚨 Alerte SOS envoyée!",
+    checkpointRecorded: "✅ Checkpoint enregistré",
+    errorLocation: "Erreur de géolocalisation - Vérifiez les permissions",
+    fillAllFields: "Veuillez remplir tous les champs",
+    incorrectCredentials: "Identifiant ou code PIN incorrect",
+    connectionError: "Erreur de connexion",
+    french: "Français",
+    english: "English"
+  },
+  en: {
+    welcome: "Welcome to Q-Control",
+    subtitle: "Connect to your mobile control space.",
+    identifier: "Identifier",
+    pin: "PIN Code",
+    login: "Login",
+    securityAgent: "Security Agent",
+    sos: "SOS",
+    scan: "SCAN",
+    checkpoint: "CHECKPOINT",
+    qControl: "Q-Control",
+    qPatrol: "Q-Patrol",
+    instructions: "Instructions",
+    report: "Report",
+    nightMode: "Night Mode",
+    language: "Language",
+    logout: "Logout",
+    sosConfirm: "Are you sure you want to send an SOS alert?",
+    cancel: "Cancel",
+    confirm: "Confirm",
+    sosSent: "🚨 SOS Alert sent!",
+    checkpointRecorded: "✅ Checkpoint recorded",
+    errorLocation: "Location error - Check permissions",
+    fillAllFields: "Please fill all fields",
+    incorrectCredentials: "Incorrect identifier or PIN code",
+    connectionError: "Connection error",
+    french: "Français",
+    english: "English"
+  }
+}
+
 function Login({ onLogin }: { onLogin: (user: any) => void }) {
   const [employeeId, setEmployeeId] = useState("")
   const [pin, setPin] = useState("")
   const [error, setError] = useState("")
   const [loading, setLoading] = useState(false)
+  const [lang, setLang] = useState('fr')
+
+  useEffect(() => {
+    const savedLang = localStorage.getItem('q_control_language') || 'fr'
+    setLang(savedLang)
+  }, [])
+
+  const t = translations[lang as keyof typeof translations]
 
   async function submit(event: React.FormEvent) { 
     event.preventDefault()
     if (!employeeId || !pin) {
-      setError("Veuillez remplir tous les champs")
+      setError(t.fillAllFields)
       return
     }
 
@@ -26,7 +96,6 @@ function Login({ onLogin }: { onLogin: (user: any) => void }) {
     setError("")
 
     try {
-      // Query employees table with employee_id and pin_code
       const { data, error: loginError } = await supabase
         .from('employees')
         .select('*')
@@ -35,12 +104,11 @@ function Login({ onLogin }: { onLogin: (user: any) => void }) {
         .single()
 
       if (loginError || !data) {
-        setError("Identifiant ou code PIN incorrect")
+        setError(t.incorrectCredentials)
         setLoading(false)
         return
       }
 
-      // Update presence to online
       await supabase
         .from('employee_presence')
         .upsert({
@@ -50,12 +118,11 @@ function Login({ onLogin }: { onLogin: (user: any) => void }) {
           last_seen: new Date().toISOString(),
         }, { onConflict: 'employee_id' })
 
-      // Store in localStorage
       localStorage.setItem('q_control_user', JSON.stringify(data))
       onLogin(data)
     } catch (err: any) {
       console.error('Login error:', err)
-      setError('Erreur de connexion')
+      setError(t.connectionError)
     } finally {
       setLoading(false)
     }
@@ -68,22 +135,22 @@ function Login({ onLogin }: { onLogin: (user: any) => void }) {
           <img src={logoUrl} alt="Q-Control" />
         </div>
         <p className="eyebrow">ESPACE SÉCURISÉ</p>
-        <h1 id="login-title">Bienvenue sur Q-Control</h1>
-        <p className="login-subtitle">Connectez-vous à votre espace de contrôle mobile.</p>
+        <h1 id="login-title">{t.welcome}</h1>
+        <p className="login-subtitle">{t.subtitle}</p>
         <form onSubmit={submit} className="login-form">
-          <label htmlFor="employeeId">Identifiant</label>
+          <label htmlFor="employeeId">{t.identifier}</label>
           <div className="input-wrap">
             <UserRound size={18} />
             <input 
               id="employeeId" 
               value={employeeId} 
               onChange={(e) => setEmployeeId(e.target.value)} 
-              placeholder="Votre identifiant" 
+              placeholder={t.identifier}
               autoComplete="username"
               disabled={loading}
             />
           </div>
-          <label htmlFor="pin">Code PIN</label>
+          <label htmlFor="pin">{t.pin}</label>
           <div className="input-wrap">
             <LockKeyhole size={18} />
             <input 
@@ -91,16 +158,38 @@ function Login({ onLogin }: { onLogin: (user: any) => void }) {
               type="password" 
               value={pin} 
               onChange={(e) => setPin(e.target.value)} 
-              placeholder="Votre code PIN" 
+              placeholder={t.pin}
               autoComplete="current-password"
               disabled={loading}
             />
           </div>
           {error && <p className="error-text" role="alert">{error}</p>}
           <button className="primary-button" type="submit" disabled={loading}>
-            {loading ? 'Connexion...' : 'Se connecter'} <ChevronRight size={18} />
+            {loading ? '...' : t.login} <ChevronRight size={18} />
           </button>
         </form>
+        
+        {/* Language selector on login */}
+        <div style={{ marginTop: '20px', textAlign: 'center' }}>
+          <button 
+            onClick={() => { 
+              const newLang = lang === 'fr' ? 'en' : 'fr'
+              setLang(newLang)
+              localStorage.setItem('q_control_language', newLang)
+            }}
+            style={{
+              background: 'none',
+              border: '1px solid #ccc',
+              padding: '8px 16px',
+              borderRadius: '8px',
+              cursor: 'pointer'
+            }}
+          >
+            <Globe2 size={16} style={{ display: 'inline', marginRight: '8px' }} />
+            {lang === 'fr' ? t.french : t.english}
+          </button>
+        </div>
+        
         <p className="login-help">Accès réservé aux agents autorisés</p>
       </section>
     </main>
@@ -113,9 +202,16 @@ function Dashboard({ user, onLogout }: { user: any; onLogout: () => void }) {
   const [activeTab, setActiveTab] = useState("Q-Control")
   const [night, setNight] = useState(false)
   const [message, setMessage] = useState("")
-  const [locationPermission, setLocationPermission] = useState<'granted' | 'denied' | 'prompt'>('prompt')
+  const [showSOSConfirm, setShowSOSConfirm] = useState(false)
+  const [lang, setLang] = useState('fr')
   
-  // Apply dark mode to document
+  useEffect(() => {
+    const savedLang = localStorage.getItem('q_control_language') || 'fr'
+    setLang(savedLang)
+  }, [])
+
+  const t = translations[lang as keyof typeof translations]
+  
   useEffect(() => {
     if (night) {
       document.documentElement.classList.add('dark')
@@ -126,7 +222,6 @@ function Dashboard({ user, onLogout }: { user: any; onLogout: () => void }) {
     }
   }, [night])
   
-  // Request geolocation permission on mount
   useEffect(() => {
     requestLocationPermission()
   }, [])
@@ -134,17 +229,11 @@ function Dashboard({ user, onLogout }: { user: any; onLogout: () => void }) {
   const requestLocationPermission = async () => {
     try {
       const permission = await Geolocation.checkPermissions()
-      console.log('📍 Location permission:', permission.location)
-      
       if (permission.location === 'prompt' || permission.location === 'prompt-with-rationale') {
-        const request = await Geolocation.requestPermissions()
-        setLocationPermission(request.location === 'granted' ? 'granted' : 'denied')
-      } else {
-        setLocationPermission(permission.location === 'granted' ? 'granted' : 'denied')
+        await Geolocation.requestPermissions()
       }
     } catch (error) {
       console.error('Location permission error:', error)
-      setLocationPermission('denied')
     }
   }
   
@@ -154,20 +243,17 @@ function Dashboard({ user, onLogout }: { user: any; onLogout: () => void }) {
   }
 
   const handleScan = () => {
-    // Navigate to scan page
     router.push('/scan')
   }
 
   const handleSOS = async () => {
     try {
-      // Check permission first
       const permission = await Geolocation.checkPermissions()
       if (permission.location === 'denied') {
-        notify("Permission géolocalisation refusée")
+        notify(t.errorLocation)
         return
       }
 
-      // Get current position using Capacitor
       const position = await Geolocation.getCurrentPosition({
         enableHighAccuracy: true,
         timeout: 10000
@@ -184,36 +270,29 @@ function Dashboard({ user, onLogout }: { user: any; onLogout: () => void }) {
         guard_phone: user.phone_number || null,
       }
       
-      console.log('🚨 Sending SOS:', sosData)
-      
       const { error: sosError } = await supabase.from('sos_alerts').insert(sosData)
       
       if (sosError) {
         console.error('SOS insert error:', sosError)
         notify("Erreur SOS")
       } else {
-        notify("🚨 Alerte SOS envoyée!")
+        notify(t.sosSent)
+        setShowSOSConfirm(false)
       }
     } catch (error: any) {
       console.error('SOS error:', error)
-      if (error.message?.includes('location')) {
-        notify("Erreur de géolocalisation - Vérifiez les permissions")
-      } else {
-        notify("Erreur SOS")
-      }
+      notify(t.errorLocation)
     }
   }
 
   const handleCheckpoint = async () => {
     try {
-      // Check permission first
       const permission = await Geolocation.checkPermissions()
       if (permission.location === 'denied') {
-        notify("Permission géolocalisation refusée")
+        notify(t.errorLocation)
         return
       }
 
-      // Get current position using Capacitor
       const position = await Geolocation.getCurrentPosition({
         enableHighAccuracy: true,
         timeout: 10000
@@ -228,14 +307,10 @@ function Dashboard({ user, onLogout }: { user: any; onLogout: () => void }) {
         timestamp: new Date().toISOString(),
       }, { onConflict: 'employee_id' })
       
-      notify("✅ Checkpoint enregistré")
+      notify(t.checkpointRecorded)
     } catch (error: any) {
       console.error('Checkpoint error:', error)
-      if (error.message?.includes('location')) {
-        notify("Erreur - Vérifiez les permissions de localisation")
-      } else {
-        notify("Erreur checkpoint")
-      }
+      notify(t.errorLocation)
     }
   }
 
@@ -254,10 +329,16 @@ function Dashboard({ user, onLogout }: { user: any; onLogout: () => void }) {
     }
   }
 
+  const changeLang = (newLang: string) => {
+    setLang(newLang)
+    localStorage.setItem('q_control_language', newLang)
+    notify(`${newLang === 'fr' ? 'Français' : 'English'}`)
+  }
+
   const nav = [
-    { label: "Q-Control", icon: ShieldCheck, action: () => setActiveTab("Q-Control") }, 
-    { label: "Q-Patrol", icon: BarChart3, action: () => { setActiveTab("Q-Patrol"); notify("Q-Patrol") } }, 
-    { label: "Instructions", icon: FileText, action: () => { setActiveTab("Instructions"); router.push('/instructions') } }
+    { label: t.qControl, icon: ShieldCheck, action: () => setActiveTab("Q-Control") }, 
+    { label: t.qPatrol, icon: BarChart3, action: () => { setActiveTab("Q-Patrol"); notify(t.qPatrol) } }, 
+    { label: t.instructions, icon: FileText, action: () => { setActiveTab("Instructions"); router.push('/instructions') } }
   ]
 
   const userName = user?.full_name || `${user?.first_name || ''} ${user?.last_name || ''}`.trim() || 'Agent'
@@ -277,12 +358,12 @@ function Dashboard({ user, onLogout }: { user: any; onLogout: () => void }) {
           </div>
           <div>
             <strong>{userName}</strong>
-            <span>Agent de sécurité</span>
+            <span>{t.securityAgent}</span>
           </div>
         </div>
         <div className="header-actions">
-          <button className="sos-button" onClick={handleSOS}>
-            <AlertTriangle size={16} fill="currentColor" /> SOS
+          <button className="sos-button" onClick={() => setShowSOSConfirm(true)}>
+            <AlertTriangle size={16} fill="currentColor" /> {t.sos}
           </button>
           <button className="icon-button" onClick={() => setMenuOpen(true)} aria-label="Ouvrir le menu">
             <Menu size={22} />
@@ -302,11 +383,11 @@ function Dashboard({ user, onLogout }: { user: any; onLogout: () => void }) {
         <div className="action-stack">
           <button className="action-button scan" onClick={handleScan}>
             <ScanLine size={22} />
-            <span>SCAN</span>
+            <span>{t.scan}</span>
           </button>
           <button className="action-button checkpoint" onClick={handleCheckpoint}>
             <LocateFixed size={22} fill="currentColor" />
-            <span>CHECKPOINT</span>
+            <span>{t.checkpoint}</span>
           </button>
         </div>
       </section>
@@ -327,6 +408,68 @@ function Dashboard({ user, onLogout }: { user: any; onLogout: () => void }) {
           <Check size={16} />{message}
         </div>
       )}
+      
+      {/* SOS Confirmation Modal */}
+      {showSOSConfirm && (
+        <>
+          <div className="drawer-overlay" onClick={() => setShowSOSConfirm(false)} />
+          <div style={{
+            position: 'fixed',
+            top: '50%',
+            left: '50%',
+            transform: 'translate(-50%, -50%)',
+            backgroundColor: 'white',
+            borderRadius: '20px',
+            padding: '30px',
+            zIndex: 1001,
+            maxWidth: '400px',
+            width: '90%',
+            boxShadow: '0 10px 40px rgba(0,0,0,0.3)'
+          }}>
+            <h2 style={{ marginTop: 0, marginBottom: '20px', color: '#dc2626' }}>
+              ⚠️ {t.sos}
+            </h2>
+            <p style={{ marginBottom: '30px', fontSize: '16px', color: '#334155' }}>
+              {t.sosConfirm}
+            </p>
+            <div style={{ display: 'flex', gap: '12px' }}>
+              <button
+                onClick={() => setShowSOSConfirm(false)}
+                style={{
+                  flex: 1,
+                  padding: '14px',
+                  backgroundColor: '#e5e7eb',
+                  color: '#1f2937',
+                  border: 'none',
+                  borderRadius: '12px',
+                  fontSize: '16px',
+                  fontWeight: 'bold',
+                  cursor: 'pointer'
+                }}
+              >
+                {t.cancel}
+              </button>
+              <button
+                onClick={handleSOS}
+                style={{
+                  flex: 1,
+                  padding: '14px',
+                  backgroundColor: '#dc2626',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '12px',
+                  fontSize: '16px',
+                  fontWeight: 'bold',
+                  cursor: 'pointer'
+                }}
+              >
+                {t.confirm}
+              </button>
+            </div>
+          </div>
+        </>
+      )}
+      
       {menuOpen && (
         <>
           <button className="drawer-overlay" aria-label="Fermer le menu" onClick={() => setMenuOpen(false)} />
@@ -342,7 +485,7 @@ function Dashboard({ user, onLogout }: { user: any; onLogout: () => void }) {
                 </div>
                 <div>
                   <strong>{userName}</strong>
-                  <span>Agent de sécurité</span>
+                  <span>{t.securityAgent}</span>
                 </div>
               </div>
               <button className="close-button" onClick={() => setMenuOpen(false)} aria-label="Fermer">
@@ -351,28 +494,28 @@ function Dashboard({ user, onLogout }: { user: any; onLogout: () => void }) {
             </div>
             <div className="drawer-items">
               <button onClick={() => { setMenuOpen(false); router.push('/rapport') }}>
-                <FileText />Rapport
+                <FileText />{t.report}
               </button>
-              <button onClick={() => notify("Historique ouvert")}>
-                <History />Historique
-              </button>
-              <button onClick={() => notify("Checkpoint ouvert")}>
-                <LocateFixed />Checkpoint
+              <button onClick={() => { setMenuOpen(false); handleCheckpoint() }}>
+                <LocateFixed />{t.checkpoint}
               </button>
               <div className="drawer-row">
                 <span>
-                  <Moon />Mode Nuit
+                  <Moon />{t.nightMode}
                 </span>
                 <button className={`switch ${night ? "on" : ""}`} onClick={() => setNight(!night)} aria-label="Activer le mode nuit">
                   <span />
                 </button>
               </div>
-              <button onClick={() => notify("Langue : Français")}>
-                <Globe2 />Langue <small>Français</small><ChevronRight />
+              <button onClick={() => {
+                const newLang = lang === 'fr' ? 'en' : 'fr'
+                changeLang(newLang)
+              }}>
+                <Globe2 />{t.language} <small>{lang === 'fr' ? t.french : t.english}</small><ChevronRight />
               </button>
             </div>
             <button className="logout" onClick={handleLogout}>
-              <LogOut />Déconnexion
+              <LogOut />{t.logout}
             </button>
           </aside>
         </>
@@ -385,7 +528,6 @@ export default function Home() {
   const [user, setUser] = useState<any>(null)
   const [loading, setLoading] = useState(true)
 
-  // Check localStorage on mount
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const savedUser = localStorage.getItem('q_control_user')
