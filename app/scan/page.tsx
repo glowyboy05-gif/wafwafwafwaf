@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect, useRef } from "react"
-import { ArrowLeft, Camera, X } from "lucide-react"
+import { X } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { supabase } from "@/lib/supabase"
 import { Html5Qrcode } from "html5-qrcode"
@@ -12,12 +12,13 @@ export default function ScanPage() {
   const [result, setResult] = useState<any>(null)
   const [showModal, setShowModal] = useState(false)
   const [scannedData, setScannedData] = useState<any>(null)
+  const [error, setError] = useState("")
+  const [permissionGranted, setPermissionGranted] = useState(false)
   const html5QrCodeRef = useRef<Html5Qrcode | null>(null)
-  const scannerRef = useRef<HTMLDivElement>(null)
 
-  // Auto-start scanner on mount
+  // Request camera permission and start scanner
   useEffect(() => {
-    startScanner()
+    requestCameraAndStart()
     
     return () => {
       // Cleanup scanner on unmount
@@ -27,9 +28,30 @@ export default function ScanPage() {
     }
   }, [])
 
+  const requestCameraAndStart = async () => {
+    try {
+      // Request camera permission first
+      const stream = await navigator.mediaDevices.getUserMedia({ 
+        video: { facingMode: "environment" } 
+      })
+      
+      // Permission granted, stop the test stream
+      stream.getTracks().forEach(track => track.stop())
+      setPermissionGranted(true)
+      
+      // Now start the actual scanner
+      await startScanner()
+    } catch (error: any) {
+      console.error('Camera permission error:', error)
+      setError("Permission caméra refusée. Activez la caméra dans les paramètres.")
+      setPermissionGranted(false)
+    }
+  }
+
   const startScanner = async () => {
     try {
       setScanning(true)
+      setError("")
       
       if (!html5QrCodeRef.current) {
         html5QrCodeRef.current = new Html5Qrcode("qr-reader")
@@ -39,18 +61,21 @@ export default function ScanPage() {
         { facingMode: "environment" },
         {
           fps: 10,
-          qrbox: { width: 250, height: 250 }
+          qrbox: { width: 250, height: 250 },
+          aspectRatio: 1.0
         },
         async (decodedText) => {
           // QR code detected
+          console.log("QR Code detected:", decodedText)
           await handleScanResult(decodedText)
         },
         (errorMessage) => {
-          // Scanning in progress
+          // Scanning errors (normal during scanning)
         }
       )
-    } catch (error) {
+    } catch (error: any) {
       console.error('Scanner start error:', error)
+      setError("Erreur: Impossible de démarrer la caméra")
       setScanning(false)
     }
   }
@@ -235,11 +260,72 @@ export default function ScanPage() {
         <div style={{ width: '40px' }}></div>
       </div>
 
+      {/* Permission Error */}
+      {error && (
+        <div style={{
+          position: 'absolute',
+          top: '50%',
+          left: '50%',
+          transform: 'translate(-50%, -50%)',
+          padding: '30px',
+          borderRadius: '12px',
+          backgroundColor: 'rgba(239, 68, 68, 0.95)',
+          color: 'white',
+          fontSize: '16px',
+          textAlign: 'center',
+          zIndex: 20,
+          maxWidth: '80%'
+        }}>
+          <p style={{ margin: '0 0 20px 0', fontSize: '18px', fontWeight: 'bold' }}>⚠️ Erreur Caméra</p>
+          <p style={{ margin: 0 }}>{error}</p>
+          <button
+            onClick={goBack}
+            style={{
+              marginTop: '20px',
+              padding: '12px 24px',
+              backgroundColor: 'white',
+              color: '#ef4444',
+              border: 'none',
+              borderRadius: '8px',
+              fontSize: '16px',
+              fontWeight: 'bold',
+              cursor: 'pointer'
+            }}
+          >
+            Retour
+          </button>
+        </div>
+      )}
+
+      {/* Loading indicator while requesting permission */}
+      {!permissionGranted && !error && (
+        <div style={{
+          position: 'absolute',
+          top: '50%',
+          left: '50%',
+          transform: 'translate(-50%, -50%)',
+          color: 'white',
+          fontSize: '18px',
+          textAlign: 'center',
+          zIndex: 20
+        }}>
+          <div style={{ 
+            width: '50px', 
+            height: '50px', 
+            border: '4px solid rgba(255,255,255,0.3)',
+            borderTop: '4px solid white',
+            borderRadius: '50%',
+            animation: 'spin 1s linear infinite',
+            margin: '0 auto 20px'
+          }} />
+          <p>Demande de permission caméra...</p>
+        </div>
+      )}
+
       {/* Full Screen Camera */}
-      {scanning && (
+      {scanning && permissionGranted && (
         <div 
           id="qr-reader" 
-          ref={scannerRef}
           style={{ 
             width: '100%', 
             height: '100%'
@@ -398,6 +484,13 @@ export default function ScanPage() {
           </div>
         </>
       )}
+
+      <style jsx>{`
+        @keyframes spin {
+          0% { transform: rotate(0deg); }
+          100% { transform: rotate(360deg); }
+        }
+      `}</style>
     </div>
   )
 }

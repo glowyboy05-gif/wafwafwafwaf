@@ -38,7 +38,8 @@ const translations = {
     incorrectCredentials: "Identifiant ou code PIN incorrect",
     connectionError: "Erreur de connexion",
     french: "Français",
-    english: "English"
+    english: "English",
+    arabic: "العربية"
   },
   en: {
     welcome: "Welcome to Q-Control",
@@ -67,7 +68,38 @@ const translations = {
     incorrectCredentials: "Incorrect identifier or PIN code",
     connectionError: "Connection error",
     french: "Français",
-    english: "English"
+    english: "English",
+    arabic: "العربية"
+  },
+  ar: {
+    welcome: "مرحبًا بك في Q-Control",
+    subtitle: "اتصل بمساحة التحكم المحمولة الخاصة بك.",
+    identifier: "المعرف",
+    pin: "رمز PIN",
+    login: "تسجيل الدخول",
+    securityAgent: "عامل أمن",
+    sos: "SOS",
+    scan: "مسح",
+    checkpoint: "نقطة تفتيش",
+    qControl: "Q-Control",
+    qPatrol: "Q-Patrol",
+    instructions: "تعليمات",
+    report: "تقرير",
+    nightMode: "الوضع الليلي",
+    language: "اللغة",
+    logout: "تسجيل الخروج",
+    sosConfirm: "هل أنت متأكد من أنك تريد إرسال تنبيه SOS؟",
+    cancel: "إلغاء",
+    confirm: "تأكيد",
+    sosSent: "🚨 تم إرسال تنبيه SOS!",
+    checkpointRecorded: "✅ تم تسجيل نقطة التفتيش",
+    errorLocation: "خطأ في الموقع - تحقق من الأذونات",
+    fillAllFields: "يرجى ملء جميع الحقول",
+    incorrectCredentials: "معرف أو رمز PIN غير صحيح",
+    connectionError: "خطأ في الاتصال",
+    french: "Français",
+    english: "English",
+    arabic: "العربية"
   }
 }
 
@@ -173,7 +205,9 @@ function Login({ onLogin }: { onLogin: (user: any) => void }) {
         <div style={{ marginTop: '20px', textAlign: 'center' }}>
           <button 
             onClick={() => { 
-              const newLang = lang === 'fr' ? 'en' : 'fr'
+              const langs = ['fr', 'en', 'ar']
+              const currentIndex = langs.indexOf(lang)
+              const newLang = langs[(currentIndex + 1) % langs.length]
               setLang(newLang)
               localStorage.setItem('q_control_language', newLang)
             }}
@@ -186,7 +220,9 @@ function Login({ onLogin }: { onLogin: (user: any) => void }) {
             }}
           >
             <Globe2 size={16} style={{ display: 'inline', marginRight: '8px' }} />
-            {lang === 'fr' ? t.french : t.english}
+            {lang === 'fr' && t.french}
+            {lang === 'en' && t.english}
+            {lang === 'ar' && t.arabic}
           </button>
         </div>
         
@@ -332,7 +368,8 @@ function Dashboard({ user, onLogout }: { user: any; onLogout: () => void }) {
   const changeLang = (newLang: string) => {
     setLang(newLang)
     localStorage.setItem('q_control_language', newLang)
-    notify(`${newLang === 'fr' ? 'Français' : 'English'}`)
+    const langName = newLang === 'fr' ? 'Français' : newLang === 'en' ? 'English' : 'العربية'
+    notify(langName)
   }
 
   const nav = [
@@ -508,10 +545,12 @@ function Dashboard({ user, onLogout }: { user: any; onLogout: () => void }) {
                 </button>
               </div>
               <button onClick={() => {
-                const newLang = lang === 'fr' ? 'en' : 'fr'
+                const langs = ['fr', 'en', 'ar']
+                const currentIndex = langs.indexOf(lang)
+                const newLang = langs[(currentIndex + 1) % langs.length]
                 changeLang(newLang)
               }}>
-                <Globe2 />{t.language} <small>{lang === 'fr' ? t.french : t.english}</small><ChevronRight />
+                <Globe2 />{t.language} <small>{lang === 'fr' ? t.french : lang === 'en' ? t.english : t.arabic}</small><ChevronRight />
               </button>
             </div>
             <button className="logout" onClick={handleLogout}>
