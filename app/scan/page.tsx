@@ -11,6 +11,7 @@ export default function ScanPage() {
   const [scannedData, setScannedData] = useState<any>(null)
   const [result, setResult] = useState<any>(null)
   const [scanning, setScanning] = useState(false)
+  const [permissionDenied, setPermissionDenied] = useState(false)
 
   useEffect(() => {
     startScanner()
@@ -20,24 +21,48 @@ export default function ScanPage() {
     }
   }, [])
 
+  const openSettings = async () => {
+    try {
+      await BarcodeScanner.openSettings()
+    } catch (error) {
+      console.error('Failed to open settings:', error)
+    }
+  }
+
   const startScanner = async () => {
     try {
-      // Request camera permission
-      const { granted } = await BarcodeScanner.requestPermissions()
-      if (!granted) {
-        alert('Permission caméra refusée')
-        router.push('/')
+      // Check current permission status
+      const status = await BarcodeScanner.checkPermissions()
+      console.log('Permission status:', status)
+
+      if (status.camera === 'denied' || status.camera === 'restricted') {
+        // Permission permanently denied, must open settings
+        setPermissionDenied(true)
         return
       }
 
-      // Make body transparent for camera view
-      document.body.classList.add('barcode-scanner-active')
+      if (status.camera !== 'granted') {
+        // Request permission
+        const { camera } = await BarcodeScanner.requestPermissions()
+        console.log('Permission result:', camera)
+        
+        if (camera === 'denied' || camera === 'restricted') {
+          setPermissionDenied(true)
+          return
+        }
 
+        if (camera !== 'granted') {
+          alert('Permission caméra requise')
+          router.push('/')
+          return
+        }
+      }
+
+      // Permission granted, start scanning
+      document.body.classList.add('barcode-scanner-active')
       setScanning(true)
 
-      // Start scanning
       const result = await BarcodeScanner.scan()
-      
       console.log('Barcode scanned:', result)
       
       if (result.barcodes && result.barcodes.length > 0) {
@@ -47,6 +72,7 @@ export default function ScanPage() {
 
     } catch (error: any) {
       console.error('Scanner error:', error)
+      alert('Erreur: ' + error.message)
       router.push('/')
     } finally {
       stopScanner()
@@ -175,6 +201,73 @@ export default function ScanPage() {
 
   return (
     <>
+      {/* Permission denied screen */}
+      {permissionDenied && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: '#000',
+          display: 'flex',
+          flexDirection: 'column',
+          justifyContent: 'center',
+          alignItems: 'center',
+          padding: '20px',
+          gap: '20px'
+        }}>
+          <div style={{
+            backgroundColor: '#ef4444',
+            color: 'white',
+            padding: '30px',
+            borderRadius: '16px',
+            textAlign: 'center',
+            maxWidth: '400px'
+          }}>
+            <div style={{ fontSize: '48px', marginBottom: '20px' }}>📷</div>
+            <h2 style={{ margin: 0, marginBottom: '15px', fontSize: '24px' }}>
+              Permission Caméra Refusée
+            </h2>
+            <p style={{ margin: 0, marginBottom: '25px', fontSize: '16px', lineHeight: '1.5' }}>
+              Vous devez activer la permission caméra dans les paramètres de l'application pour scanner les QR codes.
+            </p>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              <button
+                onClick={openSettings}
+                style={{
+                  padding: '16px',
+                  backgroundColor: 'white',
+                  color: '#ef4444',
+                  border: 'none',
+                  borderRadius: '12px',
+                  fontSize: '18px',
+                  fontWeight: 'bold',
+                  cursor: 'pointer'
+                }}
+              >
+                ⚙️ Ouvrir les Paramètres
+              </button>
+              <button
+                onClick={() => router.push('/')}
+                style={{
+                  padding: '16px',
+                  backgroundColor: '#666',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '12px',
+                  fontSize: '18px',
+                  fontWeight: 'bold',
+                  cursor: 'pointer'
+                }}
+              >
+                Retour
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Camera background - full screen */}
       {scanning && (
         <div style={{
