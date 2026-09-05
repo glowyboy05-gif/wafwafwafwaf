@@ -3,8 +3,7 @@
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { supabase } from "@/lib/supabase"
-import { Camera, CameraResultType, CameraSource } from '@capacitor/camera'
-import jsQR from 'jsqr'
+import { BarcodeScanner } from '@capacitor-mlkit/barcode-scanning'
 
 export default function ScanPage() {
   const router = useRouter()
@@ -12,83 +11,55 @@ export default function ScanPage() {
   const [scannedData, setScannedData] = useState<any>(null)
   const [result, setResult] = useState<any>(null)
   const [scanning, setScanning] = useState(false)
-  const [error, setError] = useState("")
 
   useEffect(() => {
-    // Auto-start camera when page loads
-    startCamera()
+    startScanner()
+    
+    return () => {
+      stopScanner()
+    }
   }, [])
 
-  const startCamera = async () => {
+  const startScanner = async () => {
     try {
-      setScanning(true)
-      
-      // Take a photo using Capacitor Camera
-      const image = await Camera.getPhoto({
-        quality: 90,
-        allowEditing: false,
-        resultType: CameraResultType.Uri,
-        source: CameraSource.Camera,
-        saveToGallery: false,
-        correctOrientation: true
-      })
-
-      // Convert to image data and scan for QR code
-      if (image.webPath) {
-        await decodeQRFromImage(image.webPath)
-      }
-    } catch (err: any) {
-      console.error('Camera error:', err)
-      if (err.message && err.message.includes('cancel')) {
-        // User cancelled
+      // Request camera permission
+      const { granted } = await BarcodeScanner.requestPermissions()
+      if (!granted) {
+        alert('Permission caméra refusée')
         router.push('/')
-      } else {
-        setError("Erreur caméra: " + err.message)
-      }
-    } finally {
-      setScanning(false)
-    }
-  }
-
-  const decodeQRFromImage = async (imagePath: string) => {
-    try {
-      // Create image element
-      const img = new Image()
-      img.src = imagePath
-      
-      await new Promise((resolve, reject) => {
-        img.onload = resolve
-        img.onerror = reject
-      })
-
-      // Create canvas to get image data
-      const canvas = document.createElement('canvas')
-      const context = canvas.getContext('2d')
-      if (!context) {
-        setError("Erreur canvas")
         return
       }
 
-      canvas.width = img.width
-      canvas.height = img.height
-      context.drawImage(img, 0, 0)
+      // Make body transparent for camera view
+      document.body.classList.add('barcode-scanner-active')
 
-      const imageData = context.getImageData(0, 0, canvas.width, canvas.height)
+      setScanning(true)
+
+      // Start scanning
+      const result = await BarcodeScanner.scan()
       
-      // Scan for QR code
-      const code = jsQR(imageData.data, imageData.width, imageData.height)
+      console.log('Barcode scanned:', result)
       
-      if (code && code.data) {
-        console.log('QR code found:', code.data)
-        await handleScanResult(code.data)
-      } else {
-        setError("Aucun QR code trouvé. Réessayez.")
-        setTimeout(() => router.push('/'), 2000)
+      if (result.barcodes && result.barcodes.length > 0) {
+        const code = result.barcodes[0].rawValue
+        await handleScanResult(code)
       }
-    } catch (err: any) {
-      console.error('Decode error:', err)
-      setError("Erreur de décodage: " + err.message)
-      setTimeout(() => router.push('/'), 2000)
+
+    } catch (error: any) {
+      console.error('Scanner error:', error)
+      router.push('/')
+    } finally {
+      stopScanner()
+    }
+  }
+
+  const stopScanner = async () => {
+    try {
+      await BarcodeScanner.stopScan()
+      document.body.classList.remove('barcode-scanner-active')
+      setScanning(false)
+    } catch (error) {
+      console.error('Stop scanner error:', error)
     }
   }
 
@@ -202,88 +173,87 @@ export default function ScanPage() {
     }
   }
 
-  const handleClose = () => {
-    router.push('/')
-  }
-
-  const handleRetry = () => {
-    setError("")
-    startCamera()
-  }
-
   return (
-    <div style={{
-      position: 'fixed',
-      top: 0,
-      left: 0,
-      right: 0,
-      bottom: 0,
-      backgroundColor: '#000',
-      display: 'flex',
-      flexDirection: 'column',
-      justifyContent: 'center',
-      alignItems: 'center'
-    }}>
-      {/* Scanning indicator */}
-      {scanning && !error && (
-        <div style={{ color: 'white', fontSize: '18px' }}>
-          📸 Scan en cours...
+    <>
+      {/* Camera background - full screen */}
+      {scanning && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          zIndex: 1
+        }}>
+          {/* Camera shows here automatically */}
         </div>
       )}
 
-      {/* Error */}
-      {error && (
+      {/* Scanning overlay */}
+      {scanning && (
         <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          zIndex: 10,
+          display: 'flex',
+          flexDirection: 'column',
+          justifyContent: 'space-between',
+          alignItems: 'center',
           padding: '20px',
-          backgroundColor: 'rgba(239, 68, 68, 0.9)',
-          color: 'white',
-          borderRadius: '12px',
-          textAlign: 'center',
-          maxWidth: '80%'
+          pointerEvents: 'none'
         }}>
-          <p style={{ margin: 0, marginBottom: '15px' }}>⚠️ {error}</p>
-          <div style={{ display: 'flex', gap: '10px', justifyContent: 'center' }}>
-            <button
-              onClick={handleRetry}
-              style={{
-                padding: '10px 20px',
-                backgroundColor: 'white',
-                color: '#ef4444',
-                border: 'none',
-                borderRadius: '8px',
-                cursor: 'pointer',
-                fontWeight: 'bold'
-              }}
-            >
-              Réessayer
-            </button>
-            <button
-              onClick={handleClose}
-              style={{
-                padding: '10px 20px',
-                backgroundColor: '#666',
-                color: 'white',
-                border: 'none',
-                borderRadius: '8px',
-                cursor: 'pointer'
-              }}
-            >
-              Retour
-            </button>
+          <div style={{
+            backgroundColor: 'rgba(0,0,0,0.5)',
+            color: 'white',
+            padding: '15px 30px',
+            borderRadius: '12px',
+            fontSize: '18px',
+            fontWeight: 'bold',
+            pointerEvents: 'auto'
+          }}>
+            📷 Pointez vers le QR code
           </div>
+
+          <button
+            onClick={async () => {
+              await stopScanner()
+              router.push('/')
+            }}
+            style={{
+              backgroundColor: 'rgba(239, 68, 68, 0.9)',
+              color: 'white',
+              border: 'none',
+              borderRadius: '50%',
+              width: '60px',
+              height: '60px',
+              fontSize: '30px',
+              cursor: 'pointer',
+              pointerEvents: 'auto'
+            }}
+          >
+            ×
+          </button>
         </div>
       )}
 
       {/* Result */}
       {result && (
         <div style={{
+          position: 'fixed',
+          top: '50%',
+          left: '50%',
+          transform: 'translate(-50%, -50%)',
           padding: '20px 40px',
           borderRadius: '12px',
           backgroundColor: result.success ? '#10b981' : '#ef4444',
           color: 'white',
           fontSize: '18px',
           fontWeight: 'bold',
-          textAlign: 'center'
+          textAlign: 'center',
+          zIndex: 1000
         }}>
           {result.message}
         </div>
@@ -368,6 +338,6 @@ export default function ScanPage() {
           </div>
         </>
       )}
-    </div>
+    </>
   )
 }
